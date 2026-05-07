@@ -1,0 +1,152 @@
+name: 🔧 CI Fix Agent (Master)
+
+on:
+  workflow_run:
+    workflows: ['*']
+    types: [completed]
+  workflow_call:
+    inputs:
+      agent_repo:
+        description: 'Central agent repo name (owner/repo). Defaults to the repo hosting this workflow.'
+        type: string
+        required: false
+        default: ''
+    secrets:
+      GH_TOKEN:
+        required: true
+        # GH_TOKEN is the GHES instance PAT — used for GHES API calls
+        # (issues, PRs, git operations).
+      COPILOT_GITHUB_TOKEN:
+        description: 'Optional: GitHub token for Copilot SDK auth. If not set, runner copilot login credentials are used.'
+        required: false
+
+concurrency:
+  group: ci-fix-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  ci-fix:
+    # Only run on failed workflows from copilot/ branches
+    if: |
+      github.event.workflow_run.conclusion == 'failure' &&
+      startsWith(github.event.workflow_run.head_branch, 'copilot/')
+    runs-on: self-hosted
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      actions: read
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          ref: ${{ github.event.workflow_run.head_branch }}
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: 💾 Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: 📦 Install Agent Dependencies
+        run: |
+          GHES_HOST=$(echo "${{ github.server_url }}" | sed 's|https://||')
+          OWNER="${{ github.repository_owner }}"
+          if [[ "$GHES_HOST" == "github.com" ]]; then
+            API_BASE="https://api.github.com"
+          else
+            API_BASE="https://$GHES_HOST/api/v3"
+          fi
+
+          # Create venv to avoid PEP 668 externally-managed-environment error
+          # Install python3-venv if not available (Ubuntu/Debian requires pythonX.Y-venv)
+          PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+          sudo apt-get install -y "python${PY_VER}-venv" 2>/dev/null || sudo apt-get install -y python3-venv 2>/dev/null || true
+          python3 -m venv /tmp/agent-venv
+          source /tmp/agent-venv/bin/activate
+          pip install --quiet httpx pydantic pydantic-settings structlog tenacity aiofiles jinja2 pyyaml
+          pip install --quiet github-copilot-sdk || { echo "::error::github-copilot-sdk install failed"; exit 1; }
+
+          # Clone agent module from central repo (remove stale copy first)
+          AGENT_REPO="${{ inputs.agent_repo || github.repository }}"
+          rm -rf /tmp/agent-repo
+          git clone --depth 1 "https://x-access-token:${{ secrets.GH_TOKEN }}@${GHES_HOST}/${AGENT_REPO}.git" /tmp/agent-repo
+
+      - name: 🔐 Configure Git & GitHub CLI
+        run: |
+          GHES_HOST=$(echo "${{ github.server_url }}" | sed 's|https://||')
+          git config --global credential.helper '!f() { echo "password=${GH_TOKEN}"; }; f'
+          git config --global user.name "copilot-agent[bot]"
+          git config --global user.email "copilot-agent[bot]@users.noreply.github.com"
+          gh auth login --hostname "${GHES_HOST}" --with-token <<< "${{ secrets.GH_TOKEN }}"
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: 📋 Fetch Failed Run Details
+        id: failure-info
+        run: |
+          GHES_HOST=$(echo "${{ github.server_url }}" | sed 's|https://||')
+          if [[ "$GHES_HOST" == "github.com" ]]; then
+            API_BASE="https://api.github.com"
+          else
+            API_BASE="https://$GHES_HOST/api/v3"
+          fi
+
+          RUN_ID="${{ github.event.workflow_run.id }}"
+          REPO="${{ github.repository }}"
+
+          # Get failed jobs and their logs
+          JOBS=$(curl -s -H "Authorization: token ${{ secrets.GH_TOKEN }}" \
+            "${API_BASE}/repos/${REPO}/actions/runs/${RUN_ID}/jobs" \
+            | python -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          failed = [j for j in data.get('jobs', []) if j['conclusion'] == 'failure']
+          for j in failed:
+              print(f\"Job: {j['name']} (ID: {j['id']})\")
+              for s in j.get('steps', []):
+                  if s.get('conclusion') == 'failure':
+                      print(f\"  Failed step: {s['name']}\")
+          ")
+
+          echo "failed_jobs<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$JOBS" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "branch=${{ github.event.workflow_run.head_branch }}" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: 🔧 Run CI Fix Agent
+        timeout-minutes: 30
+        run: PYTHONPATH=/tmp/agent-repo:$PYTHONPATH /tmp/agent-venv/bin/python -m agent.orchestrator --mode ci-fix
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          GITHUB_EVENT_NAME: "workflow_run"
+          FAILED_RUN_ID: ${{ steps.failure-info.outputs.run_id }}
+          FAILED_BRANCH: ${{ steps.failure-info.outputs.branch }}
+          FAILED_JOBS: ${{ steps.failure-info.outputs.failed_jobs }}
+
+      - name: 📦 Upload Logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-fix-logs-${{ github.run_id }}
+          path: logs/
+          retention-days: 30

@@ -1,0 +1,13 @@
+name: 🔧 CI Fix Agent
+on:
+  workflow_run:
+    workflows: ['*']
+    types: [completed]
+
+jobs:
+  ci-fix:
+    if: |
+      github.event.workflow_run.conclusion == 'failure' &&
+      startsWith(github.event.workflow_run.head_branch, 'copilot/')
+    uses: ./.github/workflows/ci-fix-master.yml
+    secrets: inherit

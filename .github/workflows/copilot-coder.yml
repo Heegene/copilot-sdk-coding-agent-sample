@@ -1,0 +1,11 @@
+name: 🤖 Copilot Coder
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  copilot:
+    if: |
+      github.event_name == 'issues' && github.event.label.name == 'copilot'
+    uses: ./.github/workflows/copilot-coder-master.yml
+    secrets: inherit

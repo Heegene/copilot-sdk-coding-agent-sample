@@ -1,0 +1,11 @@
+name: 🔍 Copilot Reviewer
+on:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  reviewer:
+    if: |
+      github.event_name == 'pull_request' && github.event.label.name == 'copilot-review'
+    uses: ./.github/workflows/copilot-reviewer-master.yml
+    secrets: inherit
