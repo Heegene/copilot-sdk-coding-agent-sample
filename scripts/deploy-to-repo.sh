@@ -5,7 +5,7 @@
 #   ./deploy-to-repo.sh <ghes-host> <owner> <repo> <token> [central-repo-name]
 #
 # Example:
-#   ./deploy-to-repo.sh ghes.example.com myorg my-app ghp_xxxx ghes-coding-agent
+#   ./deploy-to-repo.sh ghes.example.com myorg my-app ghp_xxxx copilot-sdk-coding-agent-sample
 #
 # This script:
 #   1. Authenticates with the GHES instance via gh CLI
@@ -38,7 +38,7 @@ usage() {
     echo "  owner              Target repository owner/org"
     echo "  repo               Target repository name"
     echo "  token              Classic PAT with repo and workflow scopes"
-    echo "  central-repo-name  Name of the central agent repo (default: ghes-coding-agent)"
+    echo "  central-repo-name  Name of the central agent repo (default: copilot-sdk-coding-agent-sample)"
     echo ""
     echo "Options:"
     echo "  --standalone       Deploy full standalone workflows instead of caller workflows."
@@ -98,7 +98,7 @@ GHES_HOST="${POSITIONAL_ARGS[0]}"
 OWNER="${POSITIONAL_ARGS[1]}"
 REPO="${POSITIONAL_ARGS[2]}"
 TOKEN="${POSITIONAL_ARGS[3]}"
-CENTRAL_REPO="${POSITIONAL_ARGS[4]:-ghes-coding-agent}"
+CENTRAL_REPO="${POSITIONAL_ARGS[4]:-copilot-sdk-coding-agent-sample}"
 
 GHES_URL="https://${GHES_HOST}"
 API_BASE="${GHES_URL}/api/v3"
@@ -398,8 +398,8 @@ if [ -n "$EXISTING_YAML" ]; then
     COMMIT_MSG="chore: set output_language=${LANG_CHOICE} in ghes-agent.yml"
 else
     NEW_YAML=$(cat <<YAML
-# ghes-coding-agent per-repository configuration
-# Full reference: https://github.com/your-org/ghes-coding-agent/blob/main/docs/SETUP.md
+# copilot-sdk-coding-agent-sample per-repository configuration
+# Full reference: https://github.com/Heegene/copilot-sdk-coding-agent-sample/blob/main/docs/SETUP.md
 output_language: ${LANG_CHOICE}
 YAML
 )

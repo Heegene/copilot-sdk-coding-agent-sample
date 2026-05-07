@@ -109,17 +109,15 @@ Body excerpt:
 - Keep the summary useful for a human reviewer skimming the PR.
 - Keep code identifiers, file paths, route names, command names, and package
     names unchanged.
-- If no verification command or test result is present in the metadata, say that
-    no verification command was captured by the agent. Do not invent test results.
+- Do not mention verification, test status, or commands. The PR body only reports
+    the summary and change footprint unless real verification results are captured
+    elsewhere.
 
 ## Output Format
 Use these exact English markers and no other top-level headings:
 
 ### SUMMARY
 <2-4 concise bullets or one short paragraph>
-
-### VERIFICATION
-<1-3 bullets>
 """
 
 # ---------------------------------------------------------------------------

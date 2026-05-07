@@ -49,10 +49,10 @@ Load previous review context -> re-review focusing on unresolved items
 ### 1. Set up the central repository
 
 ```bash
-# Fork/clone this repository to GHES
-git clone https://github.com/your-source/ghes-coding-agent.git
-cd ghes-coding-agent
-git remote set-url origin https://ghes.example.com/YOUR_ORG/ghes-coding-agent.git
+# Clone the GitHub.com source repository, then push it to your GHES central repository
+git clone https://github.com/Heegene/copilot-sdk-coding-agent-sample.git
+cd copilot-sdk-coding-agent-sample
+git remote set-url origin https://ghes.example.com/YOUR_GHES_ORG/copilot-sdk-coding-agent-sample.git
 git push -u origin main
 ```
 
@@ -155,10 +155,10 @@ sudo ./scripts/setup-runner.sh
 
 ```bash
 # Caller mode (requires reusable workflow access permission at the org level)
-./scripts/deploy-to-repo.sh ghes.example.com YOUR_ORG target-repo "$GH_TOKEN" ghes-coding-agent
+./scripts/deploy-to-repo.sh ghes.example.com YOUR_GHES_ORG target-repo "$GH_TOKEN" copilot-sdk-coding-agent-sample
 
 # Standalone mode (no cross-repo configuration required, recommended)
-./scripts/deploy-to-repo.sh ghes.example.com YOUR_ORG target-repo "$GH_TOKEN" ghes-coding-agent --standalone
+./scripts/deploy-to-repo.sh ghes.example.com YOUR_GHES_ORG target-repo "$GH_TOKEN" copilot-sdk-coding-agent-sample --standalone
 ```
 
 > **Caller vs Standalone**: Caller mode references the central repository's workflow, so updates are automatically propagated.
@@ -300,7 +300,7 @@ All settings are managed via environment variables or a `.env` file.
 ## Project Structure
 
 ```
-ghes-coding-agent/
+copilot-sdk-coding-agent-sample/
 ├── agent/                      # Main agent package
 │   ├── orchestrator.py         # Entry point, event router
 │   ├── config.py               # pydantic-settings configuration

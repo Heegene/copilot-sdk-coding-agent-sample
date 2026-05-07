@@ -30,9 +30,7 @@ class _FakeCopilotSessionManager:
     async def execute(self, prompt: str) -> str:
         return (
             "### SUMMARY\n"
-            "- Built a movie review experience with routing and shared state.\n\n"
-            "### VERIFICATION\n"
-            "- No verification command was captured by the agent."
+            "- Built a movie review experience with routing and shared state."
         )
 
 
@@ -102,7 +100,7 @@ async def test_pr_body_uses_lightweight_summary_model(
 
     assert _FakeCopilotSessionManager.models == ["gpt-5.4-mini"]
     assert "Built a movie review experience" in body
-    assert "## Verification" in body
+    assert "## Verification" not in body
     assert "## Change Footprint" in body
     assert "Changed 3 file(s)." in body
     assert "Files changed" in body
@@ -138,6 +136,7 @@ async def test_pr_body_falls_back_when_summary_model_fails(
     )
 
     assert "This PR addresses **Build movie review app**." in body
-    assert "No verification command was captured by the agent" in body
+    assert "No verification command was captured by the agent" not in body
+    assert "## Verification" not in body
     assert "Changed 1 file(s)." in body
     assert "## Changes" not in body

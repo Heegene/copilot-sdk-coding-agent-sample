@@ -142,7 +142,7 @@ class TestPromptLanguage:
         assert "Valid Diff Line Ranges" in prompt
 
     def test_coder_pr_summary_prompt_uses_ground_truth_metadata(self) -> None:
-        """PR summary prompt stays small and forbids invented verification."""
+        """PR summary prompt stays small and excludes verification claims."""
         prompt = PromptManager().render_prompt(
             "coder_pr_summary",
             issue_title="Build movie review app",
@@ -155,9 +155,9 @@ class TestPromptLanguage:
         assert "ground-truth metadata" in prompt
         assert "Do not inspect files" in prompt
         assert "Do not list every changed file" in prompt
-        assert "no verification command was captured" in prompt
+        assert "Do not mention verification" in prompt
         assert "### SUMMARY" in prompt
-        assert "### VERIFICATION" in prompt
+        assert "### VERIFICATION" not in prompt
 
 
 class TestAgentAuthoredLanguage:
@@ -182,7 +182,7 @@ class TestAgentAuthoredLanguage:
 
         assert "Closes #42" in body
         assert "## 요약" in body
-        assert "## 검증" in body
+        assert "## 검증" not in body
         assert "## 변경 규모" in body
         assert "2개 파일을 변경했습니다." in body
         assert "Files changed" in body
@@ -211,7 +211,7 @@ class TestAgentAuthoredLanguage:
         )
 
         assert "## Summary" in body
-        assert "## Verification" in body
+        assert "## Verification" not in body
         assert "## Change Footprint" in body
         assert "Changed 1 file(s)." in body
         assert "Files changed" in body

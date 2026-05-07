@@ -20,18 +20,22 @@ This guide walks through the full process of installing and configuring this Cop
 
 ---
 
-## Step 1: Clone/Fork the Central Repository
+## Step 1: Clone/Create the Central Repository
 
-Clone or fork this repository to your GHES instance.
+Clone the GitHub.com source repository, then push it to a central repository on your GHES instance.
 
 ```bash
-# Option A: Fork using gh CLI
-gh repo fork ghes-coding-agent --org YOUR_ORG --hostname ghes.example.com
+# Option A: Create the GHES central repository with gh CLI, then push
+git clone https://github.com/Heegene/copilot-sdk-coding-agent-sample.git
+cd copilot-sdk-coding-agent-sample
+gh repo create YOUR_GHES_ORG/copilot-sdk-coding-agent-sample --hostname ghes.example.com --private
+git remote set-url origin https://ghes.example.com/YOUR_GHES_ORG/copilot-sdk-coding-agent-sample.git
+git push -u origin main
 
 # Option B: Clone and push manually
-git clone https://github.com/your-source/ghes-coding-agent.git
-cd ghes-coding-agent
-git remote set-url origin https://ghes.example.com/YOUR_ORG/ghes-coding-agent.git
+git clone https://github.com/Heegene/copilot-sdk-coding-agent-sample.git
+cd copilot-sdk-coding-agent-sample
+git remote set-url origin https://ghes.example.com/YOUR_GHES_ORG/copilot-sdk-coding-agent-sample.git
 git push -u origin main
 ```
 
@@ -100,7 +104,7 @@ To allow other repositories in the organization to call workflows from the centr
 
 1. **Organization Settings** > **Actions** > **General**
 2. **Actions permissions** > Select "Allow all actions and reusable workflows"
-3. Or allow specific repositories only: "Allow select actions and reusable workflows" > Add `YOUR_ORG/ghes-coding-agent`
+3. Or allow specific repositories only: "Allow select actions and reusable workflows" > Add `YOUR_GHES_ORG/copilot-sdk-coding-agent-sample`
 
 ### Repository-Level Settings
 
@@ -158,7 +162,7 @@ pip install -r requirements.txt
 
 ```bash
 ./config.sh \
-    --url https://ghes.example.com/YOUR_ORG/ghes-coding-agent \
+    --url https://ghes.example.com/YOUR_GHES_ORG/copilot-sdk-coding-agent-sample \
     --token RUNNER_REGISTRATION_TOKEN \
     --labels copilot-agent \
     --name "copilot-runner-01"
@@ -215,14 +219,14 @@ reviewer_suggestion_model: claude-opus-4.6   # Inline suggestion formatter model
 
 ```bash
 # Bash (Linux/macOS) — default (caller workflows, English output)
-./scripts/deploy-to-repo.sh ghes.example.com YOUR_ORG target-repo "$GH_TOKEN" ghes-coding-agent
+./scripts/deploy-to-repo.sh ghes.example.com YOUR_GHES_ORG target-repo "$GH_TOKEN" copilot-sdk-coding-agent-sample
 
 # Bash — Korean output + standalone mode (when reusable-workflow cross-repo access is restricted)
-./scripts/deploy-to-repo.sh ghes.example.com YOUR_ORG target-repo "$GH_TOKEN" ghes-coding-agent \
+./scripts/deploy-to-repo.sh ghes.example.com YOUR_GHES_ORG target-repo "$GH_TOKEN" copilot-sdk-coding-agent-sample \
     --standalone --lang ko
 
 # PowerShell (Windows)
-.\scripts\deploy-to-repo.ps1 -GhesHost ghes.example.com -Owner YOUR_ORG -Repo target-repo -Token $env:GH_TOKEN -Lang ko
+.\scripts\deploy-to-repo.ps1 -GhesHost ghes.example.com -Owner YOUR_GHES_ORG -Repo target-repo -Token $env:GH_TOKEN -CentralRepo copilot-sdk-coding-agent-sample -Lang ko
 ```
 
 > The token passed to the deployment script needs the `workflow` scope because the script creates `.github/workflows/*` files in the target repository. After deployment, the target repository's runtime `GH_TOKEN` only needs `repo` for normal issue/PR/git operations. Add `workflow` to that runtime token only if the agent should be allowed to modify workflow files later.
@@ -255,9 +259,9 @@ jobs:
   copilot-coder:
     if: |
       github.event_name == 'issues' && github.event.label.name == 'copilot'
-    uses: YOUR_ORG/ghes-coding-agent/.github/workflows/copilot-coder-master.yml@main
+    uses: YOUR_GHES_ORG/copilot-sdk-coding-agent-sample/.github/workflows/copilot-coder-master.yml@main
     with:
-      agent_repo: YOUR_ORG/ghes-coding-agent
+      agent_repo: YOUR_GHES_ORG/copilot-sdk-coding-agent-sample
     secrets:
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
       COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}

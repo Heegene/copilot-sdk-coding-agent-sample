@@ -14,6 +14,10 @@
 > Copilot SDK를 이용하여 우리 애플리케이션에 Copilot의 기능을 추가할 수 있습니다! :) 
 > 이슈나 PR에 레이블을 추가하면, AI가 코드를 분석·구현하고 PR을 생성합니다.
 
+### 데모 영상
+
+[![GHES Coding Agent demo](https://img.youtube.com/vi/TaKR7z9ynIc/maxresdefault.jpg)](https://www.youtube.com/watch?v=TaKR7z9ynIc)
+
 ---
 
 ## Features (주요 기능)
@@ -51,10 +55,10 @@ Claude + GPT-5.4가 같은 조건으로 전체 범위 독립 리뷰
 ### 1. 중앙 리포지토리 설정
 
 ```bash
-# GHES에 이 리포지토리를 포크/클론
-git clone https://github.com/your-source/ghes-coding-agent.git
-cd ghes-coding-agent
-git remote set-url origin https://ghes.example.com/YOUR_ORG/ghes-coding-agent.git
+# GitHub.com 원본을 클론한 뒤 GHES 중앙 리포지토리로 push
+git clone https://github.com/Heegene/copilot-sdk-coding-agent-sample.git
+cd copilot-sdk-coding-agent-sample
+git remote set-url origin https://ghes.example.com/YOUR_GHES_ORG/copilot-sdk-coding-agent-sample.git
 git push -u origin main
 ```
 
@@ -157,10 +161,10 @@ sudo ./scripts/setup-runner.sh
 
 ```bash
 # Caller 모드 (org에서 reusable workflow 접근 허용 필요)
-./scripts/deploy-to-repo.sh ghes.example.com YOUR_ORG target-repo "$GH_TOKEN" ghes-coding-agent
+./scripts/deploy-to-repo.sh ghes.example.com YOUR_GHES_ORG target-repo "$GH_TOKEN" copilot-sdk-coding-agent-sample
 
 # Standalone 모드 (cross-repo 설정 불필요, 권장)
-./scripts/deploy-to-repo.sh ghes.example.com YOUR_ORG target-repo "$GH_TOKEN" ghes-coding-agent --standalone
+./scripts/deploy-to-repo.sh ghes.example.com YOUR_GHES_ORG target-repo "$GH_TOKEN" copilot-sdk-coding-agent-sample --standalone
 ```
 
 > **Caller vs Standalone**: Caller 모드는 중앙 레포의 workflow를 참조하므로 업데이트가 자동 반영됩니다.
@@ -302,7 +306,7 @@ PR에 copilot-review 레이블 추가
 ## Project Structure (프로젝트 구조)
 
 ```
-ghes-coding-agent/
+copilot-sdk-coding-agent-sample/
 ├── agent/                      # 메인 에이전트 패키지
 │   ├── orchestrator.py         # 진입점, 이벤트 라우터
 │   ├── config.py               # pydantic-settings 설정

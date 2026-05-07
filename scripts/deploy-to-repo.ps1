@@ -21,7 +21,7 @@
     because this deployment script creates or updates .github/workflows files.
 
 .PARAMETER CentralRepo
-    Name of the central agent repo (default: ghes-coding-agent)
+    Name of the central agent repo (default: copilot-sdk-coding-agent-sample)
 
 .PARAMETER Lang
     Output language for agent-authored comments, PR bodies, and review messages on
@@ -47,7 +47,7 @@ param(
     [string]$Token,
 
     [Parameter(Mandatory = $false)]
-    [string]$CentralRepo = "ghes-coding-agent",
+    [string]$CentralRepo = "copilot-sdk-coding-agent-sample",
 
     [Parameter(Mandatory = $false)]
     [ValidateSet("en", "ko")]
@@ -317,7 +317,7 @@ if ($ExistingYaml) {
 }
 else {
     $NewYaml = @"
-# ghes-coding-agent per-repository configuration
+# copilot-sdk-coding-agent-sample per-repository configuration
 output_language: $Lang
 "@
     $YamlCommitMsg = "chore: add ghes-agent.yml (output_language=$Lang)"

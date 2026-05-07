@@ -589,7 +589,7 @@ class CoderAgent:
         if generated_summary is None:
             generated_summary = self._fallback_pr_summary(ctx, output_language)
 
-        summary_text, verification_text = generated_summary
+        summary_text = generated_summary
         footprint_block = self._build_change_footprint(
             file_entries, shortstat, output_language,
         )
@@ -600,10 +600,6 @@ class CoderAgent:
             localized_text(output_language, en="## Summary", ko="## 요약"),
             "",
             summary_text,
-            "",
-            localized_text(output_language, en="## Verification", ko="## 검증"),
-            "",
-            verification_text,
             "",
             localized_text(
                 output_language,
@@ -632,7 +628,7 @@ class CoderAgent:
         commit_log: str,
         diff_stat: str,
         name_status: str,
-    ) -> tuple[str, str] | None:
+    ) -> str | None:
         """Generate a PR summary with a lightweight model, returning None on failure."""
         self._prompt_mgr.set_output_language(output_language)
         prompt = self._prompt_mgr.render_prompt(
@@ -666,30 +662,23 @@ class CoderAgent:
         return parsed
 
     @staticmethod
-    def _parse_pr_summary_response(raw_summary: str) -> tuple[str, str] | None:
-        """Parse the lightweight PR summary response into summary and verification."""
+    def _parse_pr_summary_response(raw_summary: str) -> str | None:
+        """Parse the lightweight PR summary response into a summary string."""
         text = (raw_summary or "").strip()
         if not text:
             return None
 
         summary_match = re.search(
-            r"(?ims)^###\s+SUMMARY\s*(.*?)(?=^###\s+VERIFICATION\s*|\Z)",
+            r"(?ims)^###\s+SUMMARY\s*(.*?)(?=^###\s+|\Z)",
             text,
         )
-        verification_match = re.search(
-            r"(?ims)^###\s+VERIFICATION\s*(.*)$",
-            text,
-        )
-        if not summary_match or not verification_match:
+        if not summary_match:
             return None
 
         summary = CoderAgent._clean_pr_summary_section(summary_match.group(1), 1600)
-        verification = CoderAgent._clean_pr_summary_section(
-            verification_match.group(1), 800,
-        )
-        if not summary or not verification:
+        if not summary:
             return None
-        return summary, verification
+        return summary
 
     @staticmethod
     def _clean_pr_summary_section(text: str, limit: int) -> str:
@@ -705,19 +694,13 @@ class CoderAgent:
     def _fallback_pr_summary(
         ctx: TriggerContext,
         output_language: str,
-    ) -> tuple[str, str]:
+    ) -> str:
         """Build deterministic PR summary text when model generation is unavailable."""
-        summary = localized_text(
+        return localized_text(
             output_language,
             en=f"This PR addresses **{ctx.issue_title}**.",
             ko=f"이 PR은 **{ctx.issue_title}** 이슈를 처리합니다.",
         )
-        verification = localized_text(
-            output_language,
-            en="- No verification command was captured by the agent.",
-            ko="- 에이전트가 캡처한 검증 명령이 없습니다.",
-        )
-        return summary, verification
 
     @staticmethod
     def _parse_name_status(name_status: str) -> list[tuple[str, str]]:

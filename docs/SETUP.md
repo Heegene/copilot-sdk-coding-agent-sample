@@ -20,18 +20,22 @@
 
 ---
 
-## Step 1: 중앙 리포지토리 클론/포크
+## Step 1: 중앙 리포지토리 클론/생성
 
-GHES 인스턴스에 이 리포지토리를 클론하거나 포크합니다.
+GitHub.com 원본 리포지토리를 클론한 뒤 GHES 인스턴스의 중앙 리포지토리로 push합니다.
 
 ```bash
-# Option A: gh CLI를 사용한 포크
-gh repo fork ghes-coding-agent --org YOUR_ORG --hostname ghes.example.com
+# Option A: gh CLI로 GHES 중앙 리포지토리 생성 후 push
+git clone https://github.com/Heegene/copilot-sdk-coding-agent-sample.git
+cd copilot-sdk-coding-agent-sample
+gh repo create YOUR_GHES_ORG/copilot-sdk-coding-agent-sample --hostname ghes.example.com --private
+git remote set-url origin https://ghes.example.com/YOUR_GHES_ORG/copilot-sdk-coding-agent-sample.git
+git push -u origin main
 
 # Option B: 직접 클론 후 push
-git clone https://github.com/your-source/ghes-coding-agent.git
-cd ghes-coding-agent
-git remote set-url origin https://ghes.example.com/YOUR_ORG/ghes-coding-agent.git
+git clone https://github.com/Heegene/copilot-sdk-coding-agent-sample.git
+cd copilot-sdk-coding-agent-sample
+git remote set-url origin https://ghes.example.com/YOUR_GHES_ORG/copilot-sdk-coding-agent-sample.git
 git push -u origin main
 ```
 
@@ -100,7 +104,7 @@ gh api --hostname ghes.example.com /user --jq '.login'
 
 1. **Organization Settings** → **Actions** → **General**
 2. **Actions permissions** → "Allow all actions and reusable workflows" 선택
-3. 또는 특정 리포지토리만 허용: "Allow select actions and reusable workflows" → `YOUR_ORG/ghes-coding-agent` 추가
+3. 또는 특정 리포지토리만 허용: "Allow select actions and reusable workflows" → `YOUR_GHES_ORG/copilot-sdk-coding-agent-sample` 추가
 
 ### 리포지토리 레벨 설정
 
@@ -160,7 +164,7 @@ pip install -r requirements.txt
 ```bash
 # Runner 바이너리 다운로드 (GHES 관리자 페이지에서 URL 확인)
 ./config.sh \
-    --url https://ghes.example.com/YOUR_ORG/ghes-coding-agent \
+    --url https://ghes.example.com/YOUR_GHES_ORG/copilot-sdk-coding-agent-sample \
     --token RUNNER_REGISTRATION_TOKEN \
     --labels copilot-agent \
     --name "copilot-runner-01"
@@ -218,14 +222,14 @@ reviewer_suggestion_model: claude-opus-4.6   # inline suggestion 변환 모델
 
 ```bash
 # Bash (Linux/macOS) — 기본 (caller 워크플로우, 영어 출력)
-./scripts/deploy-to-repo.sh ghes.example.com YOUR_ORG target-repo "$GH_TOKEN" ghes-coding-agent
+./scripts/deploy-to-repo.sh ghes.example.com YOUR_GHES_ORG target-repo "$GH_TOKEN" copilot-sdk-coding-agent-sample
 
 # Bash — 한국어 출력 + standalone 모드 (reusable workflow 접근 제약이 있을 때)
-./scripts/deploy-to-repo.sh ghes.example.com YOUR_ORG target-repo "$GH_TOKEN" ghes-coding-agent \
+./scripts/deploy-to-repo.sh ghes.example.com YOUR_GHES_ORG target-repo "$GH_TOKEN" copilot-sdk-coding-agent-sample \
     --standalone --lang ko
 
 # PowerShell (Windows)
-.\scripts\deploy-to-repo.ps1 -GhesHost ghes.example.com -Owner YOUR_ORG -Repo target-repo -Token $env:GH_TOKEN -Lang ko
+.\scripts\deploy-to-repo.ps1 -GhesHost ghes.example.com -Owner YOUR_GHES_ORG -Repo target-repo -Token $env:GH_TOKEN -CentralRepo copilot-sdk-coding-agent-sample -Lang ko
 ```
 
 > 배포 스크립트에 넘기는 토큰은 대상 리포지토리에 `.github/workflows/*` 파일을 생성하므로 `workflow` scope가 필요합니다. 배포 후 caller workflow가 런타임에 사용하는 대상 리포지토리의 `GH_TOKEN`은 일반적인 이슈/PR/git 작업에는 `repo` scope면 충분하며, agent가 나중에 workflow 파일 자체를 수정해야 하는 경우에만 `workflow`를 추가하세요.
@@ -258,9 +262,9 @@ jobs:
   copilot-coder:
     if: |
       github.event_name == 'issues' && github.event.label.name == 'copilot'
-    uses: YOUR_ORG/ghes-coding-agent/.github/workflows/copilot-coder-master.yml@main
+    uses: YOUR_GHES_ORG/copilot-sdk-coding-agent-sample/.github/workflows/copilot-coder-master.yml@main
     with:
-      agent_repo: YOUR_ORG/ghes-coding-agent
+      agent_repo: YOUR_GHES_ORG/copilot-sdk-coding-agent-sample
     secrets:
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
       COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
