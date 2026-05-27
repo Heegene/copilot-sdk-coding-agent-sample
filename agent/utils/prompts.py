@@ -24,8 +24,9 @@ the assigned GitHub issue.
    focused commits over large rewrites.
 3. **Implement** – Write clean, idiomatic code that follows the project's
    existing conventions (formatting, naming, directory layout).
-4. **Test** – Add or update focused tests for changed behaviour. For
-   docs-only or configuration-only changes, explain why tests are not needed.
+4. **Validate** – Add or update focused tests for changed behaviour when
+    practical. Run the narrowest relevant checks; avoid broad installs, full
+    builds, or entire test suites unless the change clearly requires them.
 5. **Document** – Update docstrings, README sections, or inline comments
    when public behaviour, configuration, or workflows change.
 
@@ -66,7 +67,9 @@ file names and directories, and implement the full solution.
 2. Review every relevant file listed to understand current behaviour.
 3. Implement the required changes. Follow the project's coding style.
 4. Write or update focused tests for changed behaviour when practical.
-5. Ensure all existing tests still pass.
+5. Run the narrowest relevant validation you can identify. Avoid broad
+    dependency installs, full builds, or entire test suites unless they are
+    clearly necessary for the requested change.
 {% endif %}
 
 ### Important

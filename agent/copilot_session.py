@@ -84,6 +84,10 @@ class CopilotSessionError(Exception):
     """Raised when a Copilot session encounters an unrecoverable error."""
 
 
+class CopilotAuthenticationError(CopilotSessionError):
+    """Raised when Copilot rejects the configured authentication."""
+
+
 class CopilotTimeoutError(CopilotSessionError):
     """Raised when a Copilot session exceeds its timeout."""
 
@@ -170,21 +174,27 @@ class CopilotSessionManager:
             if copilot_token
             else _without_unsupported_copilot_env_tokens()
         )
-        with auth_env:
-            self._client = self._create_sdk_client(config_kwargs)
+        try:
+            with auth_env:
+                self._client = self._create_sdk_client(config_kwargs)
 
-            await self._client.__aenter__()
+                await self._client.__aenter__()
 
-            session_kwargs: dict[str, Any] = {
-                "on_permission_request": self._handle_permission_request,
-                "model": self.model,
-            }
-            if copilot_token:
-                session_kwargs["github_token"] = copilot_token
+                session_kwargs: dict[str, Any] = {
+                    "on_permission_request": self._handle_permission_request,
+                    "model": self.model,
+                }
+                if copilot_token:
+                    session_kwargs["github_token"] = copilot_token
 
-            self._session = await (
-                await self._client.create_session(**session_kwargs)
-            ).__aenter__()
+                session = await self._create_sdk_session(session_kwargs)
+                if hasattr(session, "__aenter__"):
+                    self._session = await session.__aenter__()
+                else:
+                    self._session = session
+        except Exception as exc:
+            await self._cleanup_failed_start()
+            raise self._normalize_start_error(exc, explicit_token=bool(copilot_token)) from exc
 
         self._started = True
         self._log.info("copilot_session_started")
@@ -198,7 +208,12 @@ class CopilotSessionManager:
 
         if self._session is not None:
             try:
-                await self._session.__aexit__(None, None, None)
+                if hasattr(self._session, "__aexit__"):
+                    await self._session.__aexit__(None, None, None)
+                elif hasattr(self._session, "disconnect"):
+                    await self._session.disconnect()
+                elif hasattr(self._session, "destroy"):
+                    await self._session.destroy()
             except Exception:
                 self._log.warning("session_cleanup_error", exc_info=True)
             finally:
@@ -241,6 +256,74 @@ class CopilotSessionManager:
             return CopilotClient(**keyword_kwargs)
         except TypeError:
             return CopilotClient(config_kwargs)
+
+    async def _create_sdk_session(self, session_kwargs: dict[str, Any]) -> Any:
+        """Create a Copilot SDK session across supported SDK method shapes."""
+        if self._client is None:
+            raise CopilotSessionError("Copilot SDK client was not started")
+
+        try:
+            return await self._client.create_session(**session_kwargs)
+        except TypeError as exc:
+            try:
+                return await self._client.create_session(session_kwargs)
+            except TypeError:
+                raise exc
+
+    async def _cleanup_failed_start(self) -> None:
+        """Best-effort cleanup after SDK client startup or session creation fails."""
+        if self._session is not None:
+            try:
+                if hasattr(self._session, "__aexit__"):
+                    await self._session.__aexit__(None, None, None)
+                elif hasattr(self._session, "disconnect"):
+                    await self._session.disconnect()
+                elif hasattr(self._session, "destroy"):
+                    await self._session.destroy()
+            except Exception:
+                self._log.warning("session_cleanup_error", exc_info=True)
+            finally:
+                self._session = None
+
+        if self._client is not None:
+            try:
+                await self._client.__aexit__(None, None, None)
+            except Exception:
+                self._log.warning("client_cleanup_error", exc_info=True)
+            finally:
+                self._client = None
+
+    def _normalize_start_error(self, exc: Exception, *, explicit_token: bool) -> Exception:
+        """Convert low-level SDK startup failures into actionable agent errors."""
+        error_text = str(exc)
+        if self._is_copilot_auth_error(error_text):
+            if explicit_token:
+                return CopilotAuthenticationError(
+                    "Copilot authentication failed: COPILOT_GITHUB_TOKEN was provided "
+                    "but GitHub Copilot rejected it. Use a GitHub.com fine-grained PAT "
+                    "or OAuth token for a user with an active Copilot license and Copilot "
+                    "access; do not use the GHES GH_TOKEN or a classic ghp_ PAT. To use "
+                    "runner-stored auth instead, remove COPILOT_GITHUB_TOKEN and run "
+                    "`copilot login` once on the self-hosted runner."
+                )
+            return CopilotAuthenticationError(
+                "Copilot authentication failed: no valid stored Copilot credentials were "
+                "available. Set COPILOT_GITHUB_TOKEN to a GitHub.com token for a Copilot "
+                "licensed user, or run `copilot login` once on the self-hosted runner."
+            )
+        return exc
+
+    def _is_copilot_auth_error(self, error_text: str) -> bool:
+        """Return True when an SDK error indicates Copilot auth was rejected."""
+        lowered = error_text.lower()
+        auth_markers = (
+            "failed to fetch copilot user info",
+            "session was not created with authentication info",
+            "401",
+            "unauthorized",
+            "authentication",
+        )
+        return any(marker in lowered for marker in auth_markers)
 
     async def execute(self, prompt: str) -> str:
         """Send *prompt* and return the full assistant response as a string.

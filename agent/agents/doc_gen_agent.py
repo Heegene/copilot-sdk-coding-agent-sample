@@ -132,6 +132,7 @@ class DocGenAgent:
 
             async with CopilotSessionManager(
                 model=config.copilot.coder_model,
+                timeout=config.agent.timeout_minutes * 60,
                 working_dir=working_dir,
             ) as session:
                 response = await session.execute(prompt)
