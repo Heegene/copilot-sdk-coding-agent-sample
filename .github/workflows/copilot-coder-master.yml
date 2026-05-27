@@ -43,6 +43,7 @@ jobs:
           token: ${{ secrets.GH_TOKEN }}
 
       - name: 🐍 Setup Python
+        id: setup-python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -52,39 +53,40 @@ jobs:
         with:
           node-version: '22.x'
 
+      - name: 📥 Fetch Agent Code
+        id: agent-code
+        run: |
+          GHES_HOST=$(echo "${{ github.server_url }}" | sed 's|https://||')
+          AGENT_REPO="${{ inputs.agent_repo || github.repository }}"
+          AGENT_REPO_DIR="${RUNNER_TEMP}/agent-repo"
+          rm -rf "$AGENT_REPO_DIR"
+          git clone --depth 1 "https://x-access-token:${{ secrets.GH_TOKEN }}@${GHES_HOST}/${AGENT_REPO}.git" "$AGENT_REPO_DIR"
+          REQUIREMENTS_HASH=$(sha256sum "$AGENT_REPO_DIR/requirements.txt" | awk '{print $1}')
+          echo "requirements_hash=$REQUIREMENTS_HASH" >> "$GITHUB_OUTPUT"
+
       - name: 💾 Cache pip packages
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          key: ${{ runner.os }}-agent-pip-${{ steps.setup-python.outputs.python-version }}-${{ steps.agent-code.outputs.requirements_hash }}
           restore-keys: |
-            ${{ runner.os }}-pip-
+            ${{ runner.os }}-agent-pip-${{ steps.setup-python.outputs.python-version }}-
+            ${{ runner.os }}-agent-pip-
 
       - name: 📦 Install Agent Dependencies
         run: |
-          # Fetch agent code from central repo
-          GHES_HOST=$(echo "${{ github.server_url }}" | sed 's|https://||')
-          OWNER="${{ github.repository_owner }}"
-          if [[ "$GHES_HOST" == "github.com" ]]; then
-            API_BASE="https://api.github.com"
-          else
-            API_BASE="https://$GHES_HOST/api/v3"
+          VENV_DIR="${RUNNER_TEMP}/agent-venv"
+          rm -rf "$VENV_DIR"
+          if ! python3 -m venv "$VENV_DIR"; then
+            PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+            sudo apt-get update
+            sudo apt-get install -y "python${PY_VER}-venv" 2>/dev/null || sudo apt-get install -y python3-venv
+            rm -rf "$VENV_DIR"
+            python3 -m venv "$VENV_DIR"
           fi
-
-          # Install Python dependencies
-          # Create venv to avoid PEP 668 externally-managed-environment error
-          # Install python3-venv if not available (Ubuntu/Debian requires pythonX.Y-venv)
-          PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-          sudo apt-get install -y "python${PY_VER}-venv" 2>/dev/null || sudo apt-get install -y python3-venv 2>/dev/null || true
-          python3 -m venv /tmp/agent-venv
-          source /tmp/agent-venv/bin/activate
-          pip install --quiet httpx pydantic pydantic-settings structlog tenacity aiofiles jinja2 pyyaml
-          pip install --quiet github-copilot-sdk || { echo "::error::github-copilot-sdk install failed"; exit 1; }
-
-          # Clone agent module from central repo (remove stale copy first)
-          AGENT_REPO="${{ inputs.agent_repo || github.repository }}"
-          rm -rf /tmp/agent-repo
-          git clone --depth 1 "https://x-access-token:${{ secrets.GH_TOKEN }}@${GHES_HOST}/${AGENT_REPO}.git" /tmp/agent-repo
+          "$VENV_DIR/bin/python" -m ensurepip --upgrade
+          "$VENV_DIR/bin/python" -m pip install --upgrade --quiet pip setuptools wheel
+          "$VENV_DIR/bin/python" -m pip install --quiet -r "${RUNNER_TEMP}/agent-repo/requirements.txt"
 
       - name: 🔐 Configure Git & GitHub CLI
         run: |
@@ -98,7 +100,7 @@ jobs:
 
       - name: 🤖 Run Coding Agent
         timeout-minutes: 30
-        run: PYTHONPATH=/tmp/agent-repo:$PYTHONPATH /tmp/agent-venv/bin/python -m agent.orchestrator
+        run: PYTHONPATH="${RUNNER_TEMP}/agent-repo:$PYTHONPATH" "${RUNNER_TEMP}/agent-venv/bin/python" -m agent.orchestrator
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}

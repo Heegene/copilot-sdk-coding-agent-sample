@@ -36,11 +36,23 @@ from typing import Any
 import structlog
 
 try:
-    from copilot import CopilotClient, SubprocessConfig
+    from copilot import CopilotClient as _CopilotClient
 
+    try:
+        from copilot import SubprocessConfig as _SubprocessConfig
+    except ImportError:
+        _SubprocessConfig = None
+
+    CopilotClient: Any | None = _CopilotClient
+    SubprocessConfig: Any | None = _SubprocessConfig
     SDK_AVAILABLE = True
-except ImportError:
+except Exception as sdk_import_error:
+    CopilotClient = None
+    SubprocessConfig = None
     SDK_AVAILABLE = False
+    SDK_IMPORT_ERROR: Exception | None = sdk_import_error
+else:
+    SDK_IMPORT_ERROR = None
 
 logger = structlog.get_logger(__name__)
 
@@ -135,6 +147,7 @@ class CopilotSessionManager:
             self._log.info(
                 "sdk_unavailable_using_cli_fallback",
                 hint="pip install github-copilot-sdk",
+                import_error=str(SDK_IMPORT_ERROR) if SDK_IMPORT_ERROR else None,
             )
             self._started = True
             return
@@ -158,10 +171,7 @@ class CopilotSessionManager:
             else _without_unsupported_copilot_env_tokens()
         )
         with auth_env:
-            if config_kwargs:
-                self._client = CopilotClient(SubprocessConfig(**config_kwargs))
-            else:
-                self._client = CopilotClient()
+            self._client = self._create_sdk_client(config_kwargs)
 
             await self._client.__aenter__()
 
@@ -169,6 +179,8 @@ class CopilotSessionManager:
                 "on_permission_request": self._handle_permission_request,
                 "model": self.model,
             }
+            if copilot_token:
+                session_kwargs["github_token"] = copilot_token
 
             self._session = await (
                 await self._client.create_session(**session_kwargs)
@@ -204,6 +216,31 @@ class CopilotSessionManager:
         self._log.info("copilot_session_stopped")
 
     # -- execution ------------------------------------------------------------
+
+    def _create_sdk_client(self, config_kwargs: dict[str, Any]) -> Any:
+        """Create a Copilot SDK client across supported SDK constructor shapes."""
+        if CopilotClient is None:
+            raise CopilotSDKUnavailableError("Copilot SDK import failed")
+
+        if not config_kwargs:
+            return CopilotClient()
+
+        if SubprocessConfig is not None:
+            try:
+                return CopilotClient(SubprocessConfig(**config_kwargs))
+            except TypeError:
+                pass
+
+        keyword_kwargs: dict[str, Any] = {}
+        if "cwd" in config_kwargs:
+            keyword_kwargs["working_directory"] = config_kwargs["cwd"]
+        if "github_token" in config_kwargs:
+            keyword_kwargs["github_token"] = config_kwargs["github_token"]
+
+        try:
+            return CopilotClient(**keyword_kwargs)
+        except TypeError:
+            return CopilotClient(config_kwargs)
 
     async def execute(self, prompt: str) -> str:
         """Send *prompt* and return the full assistant response as a string.
