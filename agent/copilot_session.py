@@ -512,7 +512,9 @@ class CopilotSessionManager:
         def on_event(event: Any) -> None:
             etype = getattr(event.type, "value", str(event.type))
             if etype == "assistant.message":
-                content = event.data.content
+                content = getattr(event.data, "content", "") or ""
+                if not content:
+                    return
                 # Only keep the last message — earlier messages are
                 # intermediate thinking steps emitted while tools run.
                 chunks.clear()
